@@ -139,45 +139,47 @@ def split_raw_reaction_info(raw_reaction_info):
     note = "\n".join(raw_reaction_info[1:]) if len(raw_reaction_info) > 1 else ""
     return reaction, note
 
-
-def read_raw_reaction(raw_reaction):
 class Compound:
-def balancing_equation(compounds, input_mass):
-def calculate_mass(stoichiometry, relative_molecular_mass):
-def save_printable_form(sheet):
-def save_sampleIDs(sheet):
+    def __init__(self, name, relative_molecular_mass=None):
+    def calculate_relative_molecular_mass(self):
+    def calculate_mass(self):
+class Reaction:
+    @classmethod
+    def read_raw_reaction(raw_reaction):
+    def balancing_equation(self,input_mass):
+class Sheet:
+    def append(self, reaction):
+    def save_printable_form(self):
+    def save_sampleIDs(self):
     
 # Main----------------------------------------------#
 def main():
     doc = load_yaml_first_doc("./batch.yaml")
-    sheet = {}
+    sheet = Sheet()
 
-    sheet['date'] = doc["date"]
-    sheet['reactions'] = []
+    sheet.date = doc["date"]
     
     for raw_reaction_info in doc["reactions"]:
-        reaction = {
-                "compound_names" : [],
-                "relative_molecular_mass" : [],
-                "balance_info" : None,
-                "stoichiometry" : None,
-                "mass" : [],
-                "note" : ""
-                }
+        reaction = Reaction(
+            compound_names=[],
+            relative_molecular_mass=[],
+            balance_info=None,
+            stoichiometry=None,
+            mass=[],
+            note=""
+        )
         raw_reaction, note = split_raw_reaction_info(raw_reaction_info)
-        reaction['note'] = note
+        reaction.note = note
 
         input_mass = []
-        compounds, input_mass = read_raw_reaction(raw_reaction)
-        reaction["compound_names"] = [compound.name for compound in compounds]
-        reaction["relative_molecular_mass"] = [compound.relative_molecular_mass for compound in compounds]
-        reaction["balance_info"], reaction["stoichiometry"] = balancing_equation(compounds, input_mass)
-        reaction["mass"] = calculate_mass(reaction["stoichiometry"], reaction["relative_molecular_mass"])
-        
-        sheet['reactions'].append(reaction)
+        reaction.compounds, input_mass = Compound.read_raw_reaction(raw_reaction)
+        compound.calculate_relative_molecular_mass() for compound in reaction.compounds
+        reaction.balancing_equation(input_mass)
+        compound.calculate_mass() for compound in reaction.compounds        
+        sheet.append(reaction)
 
-    save_printable_form(sheet)
-    save_sampleIDs(sheet)
+    sheet.save_printable_form()
+    sheet.save_sampleIDs()
         
 
 if __name__ == "__main__":
