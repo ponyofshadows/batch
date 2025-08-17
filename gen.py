@@ -2,8 +2,10 @@
 # Balance the chemical equation and generate a printable form
 
 from enum import Enum, auto
+import re
 from shadowslib import (
     data.io.load_yaml_first_doc
+    data.string.to_number
 )
 
 
@@ -109,14 +111,14 @@ class MolarMass(Enum):
     Pa = '231.03588'  # Protactinium
     U = '238.02891'   # Uranium
 # Functions ---------------------------------------------------#
-def modify_temp_contorl_statement(note_first_line):
+def modify_temp_contorl_statement(note: str) -> str:
     """
-    [util, used in next func]
-    Modify the first line of the note(may be the temperature control statement.)
+    [used in main]
+    Modify the temperature control statement in the note.
     - complete the Celsius symbol (insert before a '->' if there is a number before it)
     - change '->' to right arrow 
     """
-    parts = note_first_line.split("->")
+    parts = note.split("->")
     if len(parts) > 1:
         modified_parts = []
         for part in parts[:-1]:
@@ -127,9 +129,9 @@ def modify_temp_contorl_statement(note_first_line):
         modified_parts.append("→ " + parts[-1].strip())
         return join(modified_parts)
     else:
-        return note_first_line.strip()
+        return note.strip()
     
-def split_raw_reaction_info(raw_reaction_info):
+def split_raw_reaction_info(raw_reaction_info: str) -> str,str:
     """
     [used in main]
     Read a reaction from the raw reaction info, whose 
@@ -139,48 +141,179 @@ def split_raw_reaction_info(raw_reaction_info):
     note = "\n".join(raw_reaction_info[1:]) if len(raw_reaction_info) > 1 else ""
     return reaction, note
 
-class Compound:
-    def __init__(self, name, relative_molecular_mass=None):
+class Substance:
+    def __init__(self, formula, elements_stoichiometry=None, relative_molecular_mass=None):
+        self.formula = formula
+        self.elements_stoichiometry = elements_stoichiometry
+        self.relative_molecular_mass = relative_molecular_mass
+    def parse_formula(self):
+        """
+        [used in main]
+        Parse the chemical formula to extract elements and their stoichiometry.
+        The formula is expected to be in the format: "Na2Se", "Na1.1FeO", "Ba3(PO4)2"
+        """
+        pattern = r'([A-Z][a-z]*|\d+\.?\d*|[()])'
+        words = re.findall(pattern, self.formula)
+        end_match = len(matches) - 1
+        # read from back to front
+        i = end_match
+        current_element = None
+        current_num = 1
+        current_multiplier = 1
+        while i>=0:
+            word = words[i]
+            if word.isdigit():
+                current_num = to_number(word)
+            elif word == ")":
+                current_multiplier = current_num
+                current_num = 1
+            elif word[0].isupper():
+                self.elements_stoichiometry[word] = current_num * current_multiplier
+                current_num = 1
+            elif word == "(":
+                current_multiplier = 1
+                current_num = 1        # not necessary if the user do as the rule
+
+
     def calculate_relative_molecular_mass(self):
-    def calculate_mass(self):
+        """
+        [used in main]
+        Calculate the relative molecular mass of the substance.
+        The relative molecular mass is calculated by summing the molar masses of its elements.
+        """
+        return sum([MolarMass[self.elements[i]].value * self.element_stoichiometry[i] for i in range(len(self.elements))])
+        
+        
 class Reaction:
+    def __init__(self, reactants=[],products=[],balance_info=None, stoichiometry=None, mass=None, Note=None)
+        self.reactants = reactants
+        self.products = products
+        self.balance_info = balance_info
+        self.stoichiometry = stoichiometry
+        self.mass = mass
+        self.note = Note
     @classmethod
-    def read_raw_reaction(raw_reaction):
-    def balancing_equation(self,input_mass):
+    def read_raw_reaction(cls, raw_reaction: str) -> list[Substance],list[Substance],str:
+        """ [used in main]
+        Read a raw reaction string and return the reactants, products, and input mass list.
+        The raw reaction string is expected to be in the format:
+        "Bi2O3 + NiO + Ni + Bi -> Bi0.9NiO2 0.5g"
+        """
+        substances = {}
+        substances["reactants"] = []
+        substances["products"] = []
+        input_mass_list = []
+
+        words = re.split(r"\s+|(\+|->)", raw_reaction)
+        current_formula_type = "reactants"
+        current_formula = None
+        current_mass = None
+        def consume_formula_and_mass_value():
+            substances[current_substance_type].append(
+                Substance(
+                    formula=current_formula,
+                    elements=[],
+                    element_stoichiometry=[],
+                    relative_molecular_mass=None
+                )
+            )
+            input_mass_list.append(current_mass)
+            current_formula = None
+            current_mass = None
+        for word in words:
+            if word == "->":
+                if current_formula != None:
+                    consume_formula_and_mass_value()
+                current_formula_type = "products"
+            elif word == "+":
+                if current_formula != None:
+                    consume_formula_and_mass_value()
+            elif re.fullmatch(r"\d+g", word):
+                current_mass = to_number(word[:-1])  # remove 'g' and convert to number
+                if current_substance != None:
+                    consume_formula_and_mass_value()
+            elif word[0].isupper():
+                if current_formula != None:
+                    consume_formula_and_mass_value()
+                current_formula = word
+                if current_mass != None
+                    consume_formula_and_mass_value()
+            
+            return (
+                substances["reactants"],
+                substances["products"],
+                input_mass_list
+            )
+    def balancing_equation(self):
+        """
+        [used in main]
+        Balance the chemical equation.
+        The balance_info will prompt the resaon if the equation is not balanced.
+        ---
+        - The number of unknowns is equal to the number of reactants and products minus 1
+        - The number of equations is equal to the number of elements in the reaction
+        ⬇️
+        - every element corresponds to a list of coefficients whose number is equal to the number of reactants and products
+        - In some cases, there is a positive solution only when the number of unknowns is greater than the number of linearly independent equations
+        """
+
+    def calculate_mass(self, input_mass_list: list):
+        """
+        [used in main]
+        Calculate the mass of each substance in the reaction
+        based on the input mass list.
+        """
+        self.mass = []
+        input_mass_index = 0
+        for substance in self.reactants + self.products:
+            if input_mass_list[input_mass_index] is not None:
+                equation_mole_num = input_mass_list[i] / substance.relative_molecular_mass
+                break
+            input_mass_index += 1
+        i = 0
+        for substance in self.reactants + self.products:
+            if i == input_mass_index:
+                self.mass.append(input_mass_list[i])
+            else:
+                self.mass.append(equation_mole_num * self.stoichiometry[i] * substance.relative_molecular_mass)
+
 class Sheet:
-    def append(self, reaction):
-    def save_printable_form(self):
-    def save_sampleIDs(self):
+    date = None
+    reactions =[]
+    @classmethod
+    def append(cls, reaction):
+    @classmethod
+    def save_printable_form(cls):
+    @classmethod
+    def save_sampleIDs(cls):
     
 # Main----------------------------------------------#
 def main():
     doc = load_yaml_first_doc("./batch.yaml")
-    sheet = Sheet()
 
-    sheet.date = doc["date"]
+    Sheet.date = doc["date"]
     
     for raw_reaction_info in doc["reactions"]:
         reaction = Reaction(
-            compound_names=[],
-            relative_molecular_mass=[],
+            substances=[],
             balance_info=None,
             stoichiometry=None,
-            mass=[],
-            note=""
+            note=None
         )
         raw_reaction, note = split_raw_reaction_info(raw_reaction_info)
-        reaction.note = note
+        reaction.note = modify_temp_contorl_statement(note)
 
-        input_mass = []
-        reaction.compounds, input_mass = Compound.read_raw_reaction(raw_reaction)
-        compound.calculate_relative_molecular_mass() for compound in reaction.compounds
+        input_mass_list = []
+        reaction.reactants, reaction.products, input_mass_list = Reaction.read_raw_reaction(raw_reaction)
+        for substance in reaction.reactants + reaction.products:
+            substance.parse_formula()
+            substance.calculate_relative_molecular_mass()
         reaction.balancing_equation(input_mass)
-        compound.calculate_mass() for compound in reaction.compounds        
-        sheet.append(reaction)
+        reaction.calculate_mass()
+        Sheet.append(reaction)
 
-    sheet.save_printable_form()
-    sheet.save_sampleIDs()
-        
+    Sheet.save_printable_form()
+    Sheet.save_sampleIDs()
 
 if __name__ == "__main__":
     main()
