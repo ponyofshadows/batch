@@ -248,13 +248,8 @@ class Reaction:
         """
         [used in main]
         Balance the chemical equation.
-        The balance_info will prompt the resaon if the equation is not balanced.
+        The balance_info will prompt the exact resaon if the equation is not balanced.
         ---
-        - The number of unknowns is equal to the number of reactants and products minus 1
-        - The number of equations is equal to the number of elements in the reaction
-        ⬇️
-        - every element corresponds to a list of coefficients whose number is equal to the number of reactants and products
-        - In some cases, there is a positive solution only when the number of unknowns is greater than the number of linearly independent equations
         """
 
     def calculate_mass(self, input_mass_list: list):
